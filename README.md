@@ -18,7 +18,13 @@ INET 4121 team project.
 | ---- | ------ | 
 | TBD | UNKNOWN |
 
+## Jira Board 
+| Sprint # | 
+| -------- |
+| [Sprint 1](https://inet4121-spring-2026.atlassian.net/jira/software/projects/INET/boards/34/backlog) | 
+
 ## Links
 
 - [Team Charter](https://docs.google.com/document/d/1sV1QwH8ecxSYxVmtXZKglf6mhgYD3GBoIoWfkIKETIA/edit?tab=t.0)
+- [Sprint 1](https://inet4121-spring-2026.atlassian.net/jira/software/projects/INET/boards/34/backlog)
 
