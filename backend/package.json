@@ -1,0 +1,9 @@
+{
+  "name": "incidentcommand-api",
+  "version": "0.1.0",
+  "description": "IncidentCommand Sprint 0 Hello Container",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  }
+}
