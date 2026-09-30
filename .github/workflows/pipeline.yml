@@ -25,11 +25,16 @@ jobs:
       - run: podman build -t incidentcmd-api ./backend
       - run: podman build -t incidentcmd-runbook ./services/runbook
       - run: podman build -t incidentcmd-frontend ./frontend
-      - run: podman save -o images.tar incidentcmd-api incidentcmd-runbook incidentcmd-frontend
+      - run: podman save -o api.tar incidentcmd-api
+      - run: podman save -o runbook.tar incidentcmd-runbook
+      - run: podman save -o frontend.tar incidentcmd-frontend
       - uses: actions/upload-artifact@v4
         with:
           name: built-images
-          path: images.tar
+          path: |
+            api.tar
+            runbook.tar
+            frontend.tar
 
   scan:
     runs-on: ubuntu-latest
@@ -39,11 +44,10 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: built-images
-      - run: podman load -i images.tar
       - name: Install Trivy
         run: curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
-      - run: trivy image incidentcmd-api   --exit-code 0   # warn S0-S2
-      - run: trivy image incidentcmd-runbook --exit-code 0
+      - run: trivy image --input api.tar     --exit-code 0   # warn S0-S2
+      - run: trivy image --input runbook.tar --exit-code 0
 
   policy:
     runs-on: ubuntu-latest
