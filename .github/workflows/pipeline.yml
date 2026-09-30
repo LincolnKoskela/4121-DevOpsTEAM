@@ -1,22 +1,22 @@
 # .github/workflows/pipeline.yml
 name: IncidentCommand Pipeline
 on: [push, pull_request]
- 
+
 jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - run: cd backend && npm install && npm run lint
- 
+
   sast:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: returntocorp/semgrep-action@v1
         with: { config: auto }            # warn only in S0-S1
-      - run: pip install bandit && bandit -r services/ -l || true
- 
+      - run: pip install --break-system-packages bandit && bandit -r services/ -l || true
+
   build:
     runs-on: ubuntu-latest
     needs: [lint, sast]
@@ -25,24 +25,38 @@ jobs:
       - run: podman build -t incidentcmd-api ./backend
       - run: podman build -t incidentcmd-runbook ./services/runbook
       - run: podman build -t incidentcmd-frontend ./frontend
- 
+      - run: podman save -o images.tar incidentcmd-api incidentcmd-runbook incidentcmd-frontend
+      - uses: actions/upload-artifact@v4
+        with:
+          name: built-images
+          path: images.tar
+
   scan:
     runs-on: ubuntu-latest
     needs: build
     steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: built-images
+      - run: podman load -i images.tar
+      - name: Install Trivy
+        run: curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
       - run: trivy image incidentcmd-api   --exit-code 0   # warn S0-S2
       - run: trivy image incidentcmd-runbook --exit-code 0
- 
+
   policy:
     runs-on: ubuntu-latest
     needs: build
     steps:
+      - uses: actions/checkout@v4
+      - name: Install Checkov
+        run: pip install --break-system-packages checkov
       - run: checkov -d infra/ --soft-fail   # warn S0-S3
- 
+
   deploy:
     runs-on: ubuntu-latest
     needs: [scan, policy]
     if: github.ref == 'refs/heads/main'
     steps:
       - run: echo "Deploy step — implement in Sprint 2"
-
