@@ -1,6 +1,12 @@
 const express = require('express');
-const app = express();
-app.use(express.json());
+const helmet  = require('helmet');
+const app     = express();
+
+app.use(helmet());		// Sets sercure HTTP headers
+app.use(express.json({ limit: 'lmb' }));
+
+app.use('/incidents', require('./routes/incidents'));
+app.use('/webhooks',  require('./routes/webhooks'));
 
 app.get('/', (req, res) => {
   res.json({ status: 'ok', service: 'incidentcmd-api' });
