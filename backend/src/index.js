@@ -3,7 +3,7 @@ const helmet  = require('helmet');
 const app     = express();
 
 app.use(helmet());		// Sets sercure HTTP headers
-app.use(express.json({ limit: 'lmb' }));
+app.use(express.json({ limit: '1mb' }));
 
 app.use('/incidents', require('./routes/incidents'));
 app.use('/webhooks',  require('./routes/webhooks'));
