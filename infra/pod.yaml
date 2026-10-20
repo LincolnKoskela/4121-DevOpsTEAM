@@ -9,9 +9,21 @@ spec:
     # Backend API
     - name: api
       image: localhost/incidentcmd-api:latest
-      ports:
-        - containerPort: 3000
-          hostPort: 3001
+      ports: [{ containerPort: 3000, hostPort: 3000 }]
+      env:
+        - name: DB_HOST
+          value: "134.84.73.43"
+        - name: DB_PORT
+          value: "5432"
+        - name: DB_NAME
+          value: "incidentcmd"
+        - name: DB_USER
+          value: "appuser"
+      secrets:
+        - name: db_password
+          mountPath: /run/secrets/db_password
+        - name: webhook_secret
+          mountPath: /run/secrets/webhook_secret
       securityContext:
         runAsNonRoot: true
         allowPrivilegeEscalation: false
@@ -19,9 +31,7 @@ spec:
     # Runbook Automation Service
     - name: runbook
       image: localhost/incidentcmd-runbook:latest
-      ports:
-        - containerPort: 5000
-          hostPort: 5000
+      ports: [{ containerPort: 5000, hostPort: 5000 }]
       securityContext:
         runAsNonRoot: true
         allowPrivilegeEscalation: false
@@ -29,9 +39,7 @@ spec:
     # War Room Frontend
     - name: frontend
       image: localhost/incidentcmd-frontend:latest
-      ports:
-        - containerPort: 8080
-          hostPort: 8080
+      ports: [{ containerPort: 8080, hostPort: 8080 }]
       securityContext:
         runAsNonRoot: true
         allowPrivilegeEscalation: false
