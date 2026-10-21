@@ -39,7 +39,7 @@ spec:
     # War Room Frontend
     - name: frontend
       image: localhost/incidentcmd-frontend:latest
-      ports: [{ containerPort: 8080, hostPort: 8080 }]
+      ports: [{ containerPort: 80, hostPort: 80 }]
       securityContext:
         runAsNonRoot: true
         allowPrivilegeEscalation: false
