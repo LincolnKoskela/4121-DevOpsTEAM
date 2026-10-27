@@ -68,9 +68,18 @@ IncidentCommand is being developed with long-term maintainability in mind, allow
 | [Sprint 1](https://inet4121-spring-2026.atlassian.net/jira/software/projects/INET/boards/34/backlog) | 
 | [Sprint 2](https://inet4121-spring-2026.atlassian.net/jira/software/projects/INET/boards/34/backlog) |
 
+## Port Status
+| Port # | Service | 
+| ------ | ------- | 
+| 8082 | User | 
+| 8082 | Frontend (React) | 
+| 5100 | Runbook Service | 
+| 3100 | Backend (Node.js) | 
+| 5432 | Database | 
+
 ## System Architecture
 
-![IncidentCommand Architecture](docs/Diagram.png)
+![IncidentCommand Architecture](docs/IC.png)
 
 ## Links
 
