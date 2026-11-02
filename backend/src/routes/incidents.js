@@ -86,4 +86,94 @@ router.post('/:id/responders', async (req, res) => {
   res.status(201).json(rows[0]);
 });
 
+
+// GET /incidents/:id/responders
+router.get('/:id/responders', async (req, res) => {
+  const { id } = req.params;
+
+  // Validate incident UUID
+  const UUID_PATTERN =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+  if (!UUID_PATTERN.test(id)) {
+    return res.status(400).json({
+      error: 'Invalid incident UUID'
+    });
+  }
+
+  try {
+    const incident = await pool.query(
+      'SELECT id FROM incidents WHERE id = $1',
+      [id]
+    );
+
+    if (incident.rows.length === 0) {
+      return res.status(404).json({
+        error: 'Incident not found'
+      });
+    }
+
+    const { rows } = await pool.query(
+      `SELECT id, incident_id, user_name, role, assigned_at
+       FROM responders
+       WHERE incident_id = $1
+       ORDER BY assigned_at ASC`,
+      [id]
+    );
+
+    return res.json(rows);
+  } catch (error) {
+    console.error('Failed to retrieve responders:', error.message);
+
+    return res.status(500).json({
+      error: 'Unable to retrieve responders'
+    });
+  }
+});
+
+
+// GET /incidents/:id/events
+router.get('/:id/events', async (req, res) => {
+  const { id } = req.params;
+
+  const UUID_PATTERN =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+  if (!UUID_PATTERN.test(id)) {
+    return res.status(400).json({
+      error: 'Invalid incident UUID'
+    });
+  }
+
+  try {
+    const incident = await pool.query(
+      'SELECT id FROM incidents WHERE id = $1',
+      [id]
+    );
+
+    if (incident.rows.length === 0) {
+      return res.status(404).json({
+        error: 'Incident not found'
+      });
+    }
+
+    const { rows } = await pool.query(
+      `SELECT id, incident_id, source, payload, received_at
+       FROM alert_events
+       WHERE incident_id = $1
+       ORDER BY received_at ASC, id ASC`,
+      [id]
+    );
+
+    return res.json(rows);
+
+  } catch (error) {
+    console.error('Failed to retrieve alert events:', error.message);
+
+    return res.status(500).json({
+      error: 'Unable to retrieve alert events'
+    });
+  }
+});
+
 module.exports = router;

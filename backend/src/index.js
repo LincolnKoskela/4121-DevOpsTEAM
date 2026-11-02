@@ -11,6 +11,7 @@ app.use(express.json({
 }));
 
 app.use('/incidents', require('./routes/incidents'));
+app.use('/alerts', require('./routes/alerts'));
 app.use('/webhooks',  require('./routes/webhooks'));
 
 app.get('/', (req, res) => {

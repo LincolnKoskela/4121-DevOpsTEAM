@@ -118,3 +118,145 @@ def create_runbook(rb: RunbookCreate):
     finally:
         if conn:
             conn.close()
+
+
+# 6. Retrieve runbooks for an incident
+@app.get("/runbooks/incident/{incident_id}")
+def get_incident_runbooks(incident_id: UUID):
+    conn = None
+
+    try:
+        conn = get_db()
+
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT id, incident_id, name, steps, created_at
+                FROM runbooks
+                WHERE incident_id = %s
+                ORDER BY created_at DESC, id DESC
+                """,
+                (str(incident_id),)
+            )
+
+            runbooks = [dict(row) for row in cur.fetchall()]
+
+        return runbooks
+
+    except (psycopg2.Error, KeyError, ValueError):
+        logger.exception("Failed to retrieve incident runbooks")
+
+        raise HTTPException(
+            status_code=503,
+            detail="Database operation failed"
+        )
+
+    finally:
+        if conn:
+            conn.close()
+
+
+# 7. Request body for updating a runbook step
+class RunbookStepUpdate(BaseModel):
+    completed: bool
+
+
+# 8. Update one runbook step's completion status
+@app.patch("/runbooks/{runbook_id}/steps/{step_order}")
+def update_runbook_step(
+    runbook_id: UUID,
+    step_order: int,
+    update: RunbookStepUpdate
+):
+    if step_order < 1:
+        raise HTTPException(
+            status_code=422,
+            detail="Step order must be at least 1"
+        )
+
+    conn = None
+
+    try:
+        conn = get_db()
+
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            # Lock the row to prevent concurrent updates
+            # from overwriting each other.
+            cur.execute(
+                """
+                SELECT id, steps
+                FROM runbooks
+                WHERE id = %s
+                FOR UPDATE
+                """,
+                (str(runbook_id),)
+            )
+
+            runbook = cur.fetchone()
+
+            if runbook is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Runbook not found"
+                )
+
+            steps = runbook["steps"]
+
+            if not isinstance(steps, list):
+                raise ValueError("Invalid runbook steps format")
+
+            updated_step = None
+
+            for step in steps:
+                if step.get("order") == step_order:
+                    step["completed"] = update.completed
+                    updated_step = step
+                    break
+
+            if updated_step is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Runbook step not found"
+                )
+
+            cur.execute(
+                """
+                UPDATE runbooks
+                SET steps = %s::jsonb
+                WHERE id = %s
+                """,
+                (json.dumps(steps), str(runbook_id))
+            )
+
+        conn.commit()
+
+        logger.info(
+            "Updated step %s for runbook %s",
+            step_order,
+            runbook_id
+        )
+
+        return {
+            "runbook_id": str(runbook_id),
+            "step": updated_step
+        }
+
+    except HTTPException:
+        if conn:
+            conn.rollback()
+        raise
+
+    except (psycopg2.Error, KeyError, ValueError, TypeError):
+        if conn:
+            conn.rollback()
+
+        logger.exception("Failed to update runbook step")
+
+        raise HTTPException(
+            status_code=503,
+            detail="Database operation failed"
+        )
+
+    finally:
+        if conn:
+            conn.close()
