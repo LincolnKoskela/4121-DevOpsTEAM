@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
+import './App.css';
 
 import StatusBar from './components/StatusBar';
 import IncidentTimeline from './components/IncidentTimeline';
 import ResponderList from './components/ResponderList';
 import RunbookViewer from './components/RunbookViewer';
 import AlertFeed from './components/AlertFeed';
+import SeverityChart from './components/SeverityChart';
+import CloudOpsSidebar from './components/CloudOpsSidebar';
 
 type Incident = {
   id: string;
@@ -15,10 +18,18 @@ type Incident = {
   declared_at: string;
 };
 
+type Page = 'Overview' | 'Incidents' | 'Alerts' | 'Runbooks';
+type Theme = 'light' | 'dark';
+
 function App() {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState<Page>('Overview');
+  const [theme, setTheme] = useState<Theme>('light');
+  const [search, setSearch] = useState('');
+  const [priorityFilter, setPriorityFilter] = useState('All');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -34,61 +45,246 @@ function App() {
         }
 
         const data: Incident[] = await response.json();
-        setIncidents(data);
-      } catch (err) {
-        if (controller.signal.aborted) return;
-
-        setError(
-          err instanceof Error ? err.message : 'Failed to load incidents'
-        );
-      } finally {
         if (!controller.signal.aborted) {
-          setLoading(false);
+          setIncidents(data);
+          setSelectedId(data[0]?.id ?? null);
         }
+      } catch (err) {
+        if (!controller.signal.aborted) {
+          setError(
+            err instanceof Error ? err.message : 'Failed to load incidents'
+          );
+        }
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
       }
     }
 
     loadIncidents();
-
     return () => controller.abort();
   }, []);
 
-  if (loading) {
-    return <p>Loading incidents...</p>;
-  }
+  const activeIncidents = incidents.filter(
+    (incident) =>
+      !['resolved', 'closed'].includes(incident.status.toLowerCase())
+  );
 
-  if (error) {
-    return <p role="alert">Error: {error}</p>;
-  }
+  const criticalIncidents = incidents.filter(
+    (incident) => incident.priority.toUpperCase() === 'P1'
+  );
+
+  const filteredIncidents = incidents.filter((incident) => {
+    const matchesSearch = incident.title
+      .toLowerCase()
+      .includes(search.toLowerCase());
+
+    const matchesPriority =
+      priorityFilter === 'All' ||
+      incident.priority.toUpperCase() === priorityFilter;
+
+    return matchesSearch && matchesPriority;
+  });
+
+  const selectedIncident =
+    incidents.find((incident) => incident.id === selectedId) ?? null;
+
+  const metrics = [
+    { label: 'Total Incidents', value: incidents.length, icon: '📋' },
+    { label: 'Active Incidents', value: activeIncidents.length, icon: '⚡' },
+    { label: 'Critical / P1', value: criticalIncidents.length, icon: '🚨' }
+  ];
 
   return (
-    <div style={{ padding: '30px' }}>
-      <h1>Incident Command War Room</h1>
+    <div className="cloudops-app" data-theme={theme}>
+      <div className="cloudops-layout">
+        <CloudOpsSidebar page={page} onNavigate={setPage} />
 
-      <h2>Active Incidents</h2>
-
-      {incidents.length === 0 ? (
-        <p>No incidents found.</p>
-      ) : (
-        incidents.map((incident) => (
-          <div key={incident.id}>
-            <h3>{incident.title}</h3>
-            <p>Declared by: {incident.declared_by}</p>
-
-            <StatusBar
-              priority={incident.priority}
-              status={incident.status}
-            />
-
-            <ResponderList incidentId={incident.id} />
-            <RunbookViewer incidentId={incident.id} />
-            <IncidentTimeline incidentId={incident.id} />
-            <hr />
+        <div className="cloudops-content">
+      <header className="cloudops-card" style={{ borderRadius: 0 }}>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: 16
+        }}>
+          <div>
+            <h2 style={{ margin: 0 }}>☁️ CloudOps Control Tower</h2>
+            <small style={{ color: 'var(--cloud-muted)' }}>
+              Incident Command · DevSecOps Operations
+            </small>
           </div>
-        ))
-      )}
 
-      <AlertFeed />
+          <button
+            className="cloudops-button"
+            onClick={() =>
+              setTheme(theme === 'light' ? 'dark' : 'light')
+            }
+          >
+            {theme === 'light' ? '🌙 Dark Mode' : '☀️ Light Mode'}
+          </button>
+        </div>
+      </header>
+
+        <main className="cloudops-main">
+        <h1 style={{ marginBottom: 6 }}>
+          {page === 'Overview'
+            ? 'Infrastructure Overview'
+            : page === 'Incidents'
+            ? 'Incident Management'
+            : page === 'Alerts'
+            ? 'Security Alerts'
+            : 'Recovery Runbooks'}
+        </h1>
+
+        <p style={{ color: 'var(--cloud-muted)' }}>
+          Centralized operational visibility and incident response
+        </p>
+
+        {loading && <p>Loading incidents...</p>}
+
+        {error && <p role="alert">Error: {error}</p>}
+
+        {!loading && !error && (
+          <>
+            {(page === 'Overview' || page === 'Incidents') && (
+              <>
+                <div className="cloudops-grid" style={{ margin: '24px 0' }}>
+                  {metrics.map((metric) => (
+                    <div className="cloudops-card" key={metric.label}>
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center'
+                      }}>
+                        <span style={{ color: 'var(--cloud-muted)' }}>
+                          {metric.label}
+                        </span>
+                        <span aria-hidden="true">{metric.icon}</span>
+                      </div>
+                      <h2 style={{ fontSize: 32, marginBottom: 0 }}>
+                        {metric.value}
+                      </h2>
+                    </div>
+                  ))}
+                </div>
+
+                {page === "Overview" && (
+                  <div style={{ marginBottom: 20 }}>
+                    <SeverityChart incidents={incidents} />
+                  </div>
+                )}
+
+                <section className="cloudops-card">
+                  <h2>Incident Explorer</h2>
+
+                  <div style={{
+                    display: 'flex',
+                    gap: 12,
+                    flexWrap: 'wrap',
+                    marginBottom: 20
+                  }}>
+                    <input
+                      className="cloudops-input"
+                      style={{ flex: '1 1 220px' }}
+                      placeholder="Search incidents..."
+                      aria-label="Search incidents"
+                      value={search}
+                      onChange={(event) => setSearch(event.target.value)}
+                    />
+
+                    <select
+                      className="cloudops-input"
+                      style={{ flex: '0 1 140px' }}
+                      aria-label="Filter by priority"
+                      value={priorityFilter}
+                      onChange={(event) =>
+                        setPriorityFilter(event.target.value)
+                      }
+                    >
+                      <option value="All">All priorities</option>
+                      <option value="P1">P1</option>
+                      <option value="P2">P2</option>
+                      <option value="P3">P3</option>
+                      <option value="P4">P4</option>
+                    </select>
+                  </div>
+
+                  {filteredIncidents.length === 0 ? (
+                    <p>No incidents match your search.</p>
+                  ) : (
+                    filteredIncidents.map((incident) => (
+                      <button
+                          type="button"
+                          key={incident.id}
+                          className={`cloudops-incident-card ${
+                            selectedId === incident.id ? 'is-selected' : ''
+                          }`}
+                          data-priority={incident.priority.toUpperCase()}
+                          aria-pressed={selectedId === incident.id}
+                          onClick={() => setSelectedId(incident.id)}
+                        >
+                          <div className="cloudops-incident-card-top">
+                            <span className="cloudops-incident-priority">
+                              {incident.priority.toUpperCase()}
+                            </span>
+                            {selectedId === incident.id && (
+                              <span className="cloudops-incident-selection">Selected</span>
+                            )}
+                          </div>
+                          <strong className="cloudops-incident-title">{incident.title}</strong>
+                          <div className="cloudops-incident-card-bottom">
+                            <span>Declared by: {incident.declared_by}</span>
+                            <span className="cloudops-incident-status">{incident.status}</span>
+                          </div>
+                      </button>
+                    ))
+                  )}
+                </section>
+
+                {selectedIncident && (
+                  <section
+                    className="cloudops-card"
+                    style={{ marginTop: 20 }}
+                  >
+                    <h2>Incident Workspace</h2>
+                    <h3>{selectedIncident.title}</h3>
+
+                    <StatusBar
+                      priority={selectedIncident.priority}
+                      status={selectedIncident.status}
+                    />
+
+                    <ResponderList incidentId={selectedIncident.id} />
+                    <RunbookViewer incidentId={selectedIncident.id} />
+                    <IncidentTimeline incidentId={selectedIncident.id} />
+                  </section>
+                )}
+              </>
+            )}
+
+            {page === 'Alerts' && (
+              <section className="cloudops-card">
+                <AlertFeed />
+              </section>
+            )}
+
+            {page === 'Runbooks' && (
+              <section className="cloudops-card">
+                <h2>Recovery Runbooks</h2>
+                {incidents.map((incident) => (
+                  <div key={incident.id} style={{ marginBottom: 24 }}>
+                    <h3>{incident.title}</h3>
+                    <RunbookViewer incidentId={incident.id} />
+                  </div>
+                ))}
+              </section>
+            )}
+          </>
+        )}
+        </main>
+        </div>
+      </div>
     </div>
   );
 }
