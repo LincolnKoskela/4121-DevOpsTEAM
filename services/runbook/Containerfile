@@ -8,7 +8,7 @@ COPY requirements.txt .
 
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY --chown=runbook:runbook app/ ./app/
+COPY app/ ./app/
 
 USER runbook
 

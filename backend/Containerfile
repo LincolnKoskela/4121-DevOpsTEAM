@@ -2,13 +2,14 @@ FROM node:lts-alpine
 
 WORKDIR /app
 
-COPY --chown=node:node package*.json ./
+COPY package*.json ./
 
-RUN npm ci --only=production
+RUN npm ci --only=production && \
+    addgroup -S appgroup && adduser -S appuser -G appgroup
 
-COPY --chown=node:node src/ ./src/
+COPY src/ ./src/
 
-USER node
+USER appuser 
 
 EXPOSE 3000
 
