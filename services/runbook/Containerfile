@@ -1,17 +1,16 @@
-FROM python:3.12-slim
+FROM docker.io/library/python@sha256:69ebe56e2a764c399514a0a6117131cb730cc4d0e71e85c08deb9af74cbb9f41
 
 WORKDIR /app
 
-RUN groupadd -r runbook && useradd -r -g runbook runbook
+RUN addgroup -S runbook && adduser -S -G runbook runbook
 
 COPY requirements.txt .
-
-RUN pip install --no-cache-dir -r requirements.txt
+RUN python -m pip install --no-cache-dir --only-binary=:all: -r requirements.txt \
+    && python -m pip check
 
 COPY --chown=runbook:runbook app/ ./app/
 
 USER runbook
 
 EXPOSE 5000
-
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "5000"]
+CMD ["uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "5000"]
