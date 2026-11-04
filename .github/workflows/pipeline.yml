@@ -15,7 +15,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: returntocorp/semgrep-action@v1
         with: { config: auto }            # warn only in S0-S1
-      - run: pip install bandit && bandit -r services/ -l || true
+
+      - run: pip install --break-system-packages bandit && bandit -r services/ -l || true
+
 
   build:
     runs-on: ubuntu-latest
@@ -25,45 +27,51 @@ jobs:
       - run: podman build -t incidentcmd-api ./backend
       - run: podman build -t incidentcmd-runbook ./services/runbook
       - run: podman build -t incidentcmd-frontend ./frontend
+
+      - run: podman save -o api.tar incidentcmd-api
+      - run: podman save -o runbook.tar incidentcmd-runbook
+      - run: podman save -o frontend.tar incidentcmd-frontend
+      - uses: actions/upload-artifact@v4
+        with:
+          name: built-images
+          path: |
+            api.tar
+            runbook.tar
+            frontend.tar
+
+
   scan:
     runs-on: ubuntu-latest
     needs: build
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build API image
-        run: docker build -t incidentcmd-api:latest ./backend
-
-      - name: Build runbook image
-        run: docker build -t incidentcmd-runbook:latest ./services/runbook
-
-      - name: Scan API image
-        uses: aquasecurity/trivy-action@0.33.1
+      - uses: actions/download-artifact@v4
         with:
-          image-ref: incidentcmd-api:latest
-          severity: CRITICAL,HIGH
-          exit-code: '0'
+          name: built-images
+      - name: Install Trivy
+        run: curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+      - run: trivy image --input api.tar     --exit-code 0   # warn S0-S2
+      - run: trivy image --input runbook.tar --exit-code 0
 
-      - name: Scan runbook image
-        uses: aquasecurity/trivy-action@0.33.1
-        with:
-          image-ref: incidentcmd-runbook:latest
-          severity: CRITICAL,HIGH
-          exit-code: '0'
+
   policy:
     runs-on: ubuntu-latest
     needs: build
     steps:
       - uses: actions/checkout@v4
       - name: Install Checkov
+
         run: pip install checkov
       - name: Run Checkov
         run: checkov -d infra/ --soft-fail
+
   deploy:
     runs-on: ubuntu-latest
     needs: [scan, policy]
     if: github.ref == 'refs/heads/main'
     steps:
+
       - run: echo "Deploy step — implement in Sprint 2"
   sca:
     runs-on: ubuntu-latest

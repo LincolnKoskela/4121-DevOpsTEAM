@@ -2,3 +2,5 @@ node_modules/
 .venv/
 .venv312/
 reports/
+__pycache__/
+*.py[cod]
