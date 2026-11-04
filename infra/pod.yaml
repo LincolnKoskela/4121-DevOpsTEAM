@@ -15,7 +15,7 @@ spec:
           value: "134.84.73.43"
         - name: DB_PORT
           value: "5432"
-        - name: DB_NAMiE
+        - name: DB_NAME
           value: "incidentcmd"
         - name: DB_USER
           value: "appuser"

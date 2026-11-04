@@ -9,7 +9,7 @@ RUN npm ci --only=production && \
 
 COPY src/ ./src/
 
-USER appuser 
+USER node 
 
 EXPOSE 3000
 
