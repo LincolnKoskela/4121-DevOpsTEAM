@@ -90,6 +90,17 @@ jobs:
   snyk:
     runs-on: ubuntu-latest
     steps:
+      - name: Verify Snyk secret
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          if [ -n "$SNYK_TOKEN" ]; then
+            echo "SNYK_TOKEN is available"
+          else
+            echo "SNYK_TOKEN is missing"
+            exit 1
+          fi
+
       - uses: actions/checkout@v4
 
       - name: Set up Node.js
