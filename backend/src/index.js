@@ -2,6 +2,8 @@ const express = require('express');
 const helmet  = require('helmet');
 const app     = express();
 
+require('./escalation');
+
 app.use(helmet());		// Sets sercure HTTP headers
 app.use(express.json({
   limit: '1mb',
