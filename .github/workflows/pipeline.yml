@@ -124,8 +124,12 @@ jobs:
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: snyk test --file=backend/package.json --severity-threshold=critical
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - name: Install Python dependencies
-        run: python3 -m pip install -r services/runbook/requirements.txt
+        run: python -m pip install -r services/runbook/requirements.txt
       - name: Scan Python runbook dependencies
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
