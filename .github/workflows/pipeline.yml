@@ -132,13 +132,21 @@ jobs:
           name: sprint3-container-images
 
       - name: Install Trivy
-        uses: aquasecurity/setup-trivy@v0.2.4
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          curl -fsSL \
+            https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
+            -o /tmp/install-trivy.sh
+          sh /tmp/install-trivy.sh -b "$HOME/.local/bin"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Install Grype
         run: |
-          curl -sSfL \
+          mkdir -p "$HOME/.local/bin"
+          curl -fsSL \
             https://raw.githubusercontent.com/anchore/grype/main/install.sh \
-            | sh -s -- -b "$HOME/.local/bin"
+            -o /tmp/install-grype.sh
+          sh /tmp/install-grype.sh -b "$HOME/.local/bin"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Scan images with Trivy
