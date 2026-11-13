@@ -93,6 +93,7 @@ function App() {
   const [priorityFilter, setPriorityFilter] = useState('All');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
+  const [lastUpdated, setLastUpdated] = useState<number | null>(null);
 
  useEffect(() => {
   const timer = window.setInterval(() => {
@@ -127,6 +128,7 @@ function App() {
         );
 
         setError(null);
+        setLastUpdated(Date.now());
       }
     } catch (err) {
       if (!controller.signal.aborted) {
@@ -160,7 +162,7 @@ function App() {
   );
 
   const criticalIncidents = incidents.filter(
-  (incident) => ['P0', 'P1', 'P3'].includes(incident.priority.toUpperCase())
+  (incident) => ['P0', 'P1'].includes(incident.priority.toUpperCase())
 );
 
   const filteredIncidents = incidents.filter((incident) => {
@@ -181,7 +183,7 @@ function App() {
   const metrics = [
     { label: 'Total Incidents', value: incidents.length, icon: '📋' },
     { label: 'Active Incidents', value: activeIncidents.length, icon: '⚡' },
-    { label: 'Critical / P0–P3', value: criticalIncidents.length, icon: '🚨' }
+    { label: 'High Severity / P0–P1', value: criticalIncidents.length, icon: '🚨' }
   ];
 
   return (
@@ -205,6 +207,28 @@ function App() {
             </small>
           </div>
 
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 16,
+            flexWrap: 'wrap'
+          }}>
+            <div role="status" style={{
+              fontSize: 12,
+              color: 'var(--cloud-muted)'
+            }}>
+              <span style={{
+                color: error ? '#dc2626' : lastUpdated ? '#15803d' : '#64748b',
+                fontWeight: 700
+              }}>
+                {error ? '● API Disconnected' : lastUpdated ? '● API Connected' : '● Connecting'}
+              </span>
+              {lastUpdated && (
+                <span style={{ marginLeft: 10 }}>
+                  Last updated: {new Date(lastUpdated).toLocaleTimeString()}
+                </span>
+              )}
+            </div>
           <button
             className="cloudops-button"
             onClick={() =>
@@ -213,6 +237,7 @@ function App() {
           >
             {theme === 'light' ? '🌙 Dark Mode' : '☀️ Light Mode'}
           </button>
+          </div>
         </div>
       </header>
 
