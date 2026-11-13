@@ -1,10 +1,14 @@
 FROM docker.io/library/node@sha256:4eefa1bfce4197942661ef9148247d779ddf1bb0ee006d3294a467609de60724 AS dependencies
 
+RUN apk upgrade --no-cache
+
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev
 
 FROM docker.io/library/node@sha256:4eefa1bfce4197942661ef9148247d779ddf1bb0ee006d3294a467609de60724
+
+RUN apk upgrade --no-cache
 
 WORKDIR /app
 

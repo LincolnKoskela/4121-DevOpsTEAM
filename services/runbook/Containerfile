@@ -1,5 +1,7 @@
 FROM docker.io/library/python@sha256:69ebe56e2a764c399514a0a6117131cb730cc4d0e71e85c08deb9af74cbb9f41
 
+RUN apk upgrade --no-cache
+
 WORKDIR /app
 
 RUN addgroup -S runbook && adduser -S -G runbook runbook
