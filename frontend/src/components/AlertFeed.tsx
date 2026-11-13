@@ -57,7 +57,7 @@ function AlertFeed() {
   }, []);
 
   return (
-    <section>
+    <section className="cloudops-alert-feed">
       <h2>Alert Feed</h2>
 
       {loading ? (

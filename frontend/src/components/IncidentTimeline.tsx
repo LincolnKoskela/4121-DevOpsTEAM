@@ -73,7 +73,7 @@ function IncidentTimeline({ incidentId }: IncidentTimelineProps) {
   }
 
   return (
-    <section>
+    <section className="cloudops-incident-timeline">
       <h4>Incident Timeline</h4>
 
       {events.length === 0 ? (

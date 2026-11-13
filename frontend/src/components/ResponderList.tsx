@@ -54,7 +54,7 @@ function ResponderList({ incidentId }: Props) {
   }, [incidentId]);
 
   return (
-    <section>
+    <section className="cloudops-responder-list">
       <h2>Responders</h2>
 
       {loading && <p>Loading responders...</p>}

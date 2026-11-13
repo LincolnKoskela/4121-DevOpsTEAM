@@ -371,7 +371,7 @@ function App() {
                     />
 
                     <div
-  className="cloudops-card"
+  className="cloudops-card cloudops-escalation-panel"
   style={{ marginTop: 20, marginBottom: 20 }}
 >
   <h3>⏱ Escalation Monitoring</h3>
@@ -396,14 +396,18 @@ function App() {
 
         <p>
           <strong>Status:</strong>{' '}
-          <span style={{ color: escalation.color, fontWeight: 700 }}>
+          <span
+            className="cloudops-escalation-badge"
+            style={{ color: escalation.color }}
+          >
             {escalation.label}
           </span>
         </p>
 
-        <p style={{ color: 'var(--cloud-muted)' }}>
-          {escalation.detail}
-        </p>
+        <div className="cloudops-escalation-timestamp">
+          <span aria-hidden="true">🕒</span>
+          <span>{escalation.detail}</span>
+        </div>
       </>
     );
   })()}
@@ -418,7 +422,7 @@ function App() {
   </p>
 
   <a
-    className="cloudops-button"
+    className="cloudops-button cloudops-download-button"
     href={`/api/runbooks/incident/${selectedIncident.id}/postmortem`}
     download={`postmortem-${selectedIncident.id}.pdf`}
     style={{
@@ -429,9 +433,17 @@ function App() {
     ⬇ Download Post-Mortem PDF
   </a>
 </div>
-                    <ResponderList incidentId={selectedIncident.id} />
-                    <RunbookViewer incidentId={selectedIncident.id} />
-                    <IncidentTimeline incidentId={selectedIncident.id} />
+                    <div className="cloudops-workspace-grid">
+                      <div className="cloudops-workspace-panel">
+                        <ResponderList incidentId={selectedIncident.id} />
+                      </div>
+                      <div className="cloudops-workspace-panel">
+                        <RunbookViewer incidentId={selectedIncident.id} />
+                      </div>
+                    </div>
+                    <div className="cloudops-workspace-panel cloudops-timeline-panel">
+                      <IncidentTimeline incidentId={selectedIncident.id} />
+                    </div>
                   </section>
                 )}
               </>

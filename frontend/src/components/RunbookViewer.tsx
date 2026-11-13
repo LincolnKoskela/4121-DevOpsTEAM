@@ -119,7 +119,7 @@ function RunbookViewer({ incidentId }: RunbookViewerProps) {
   if (loading) return <p>Loading runbooks...</p>;
 
   return (
-    <section>
+    <section className="cloudops-runbook-viewer">
       <h4>Incident Runbooks</h4>
 
       {error && <p role="alert">Runbook error: {error}</p>}
