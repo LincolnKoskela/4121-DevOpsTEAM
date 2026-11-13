@@ -1,4 +1,5 @@
 const express = require('express');
+const { startEscalationTimer } = require('./escalation');
 const helmet  = require('helmet');
 const app     = express();
 
@@ -27,4 +28,5 @@ const HOST = process.env.HOST || '127.0.0.1';
 
 app.listen(PORT, HOST, () => {
   console.log(`API listening on ${HOST}:${PORT}`);
+  startEscalationTimer();
 });

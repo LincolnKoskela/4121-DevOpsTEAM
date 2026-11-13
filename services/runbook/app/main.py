@@ -1,3 +1,6 @@
+from io import BytesIO
+from fastapi.responses import StreamingResponse
+from .postmortem import generate_postmortem
 import json
 import logging
 import os
@@ -255,6 +258,80 @@ def update_runbook_step(
         raise HTTPException(
             status_code=503,
             detail="Database operation failed"
+        )
+
+    finally:
+        if conn:
+            conn.close()
+@app.get("/runbooks/incident/{incident_id}/postmortem")
+def download_postmortem(incident_id: UUID):
+    conn = None
+
+    try:
+        conn = get_db()
+
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                "SELECT * FROM incidents WHERE id = %s",
+                (str(incident_id),)
+            )
+
+            incident = cur.fetchone()
+
+            if incident is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Incident not found"
+                )
+
+            cur.execute(
+                """
+                SELECT id, source, payload, received_at
+                FROM alert_events
+                WHERE incident_id = %s
+                ORDER BY received_at ASC, id ASC
+                """,
+                (str(incident_id),)
+            )
+
+            events = [dict(row) for row in cur.fetchall()]
+
+            cur.execute(
+                """
+                SELECT id, name, steps, created_at
+                FROM runbooks
+                WHERE incident_id = %s
+                ORDER BY created_at ASC, id ASC
+                """,
+                (str(incident_id),)
+            )
+
+            runbooks = [dict(row) for row in cur.fetchall()]
+
+        pdf_bytes = generate_postmortem(
+            dict(incident),
+            events,
+            runbooks
+        )
+
+        return StreamingResponse(
+            BytesIO(pdf_bytes),
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition":
+                    f'attachment; filename="postmortem-{incident_id}.pdf"'
+            }
+        )
+
+    except HTTPException:
+        raise
+
+    except (psycopg2.Error, KeyError, ValueError):
+        logger.exception("Post-mortem database operation failed")
+
+        raise HTTPException(
+            status_code=503,
+            detail="Unable to generate post-mortem"
         )
 
     finally:

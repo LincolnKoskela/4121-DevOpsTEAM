@@ -1,26 +1,4 @@
-# Dependencies
-node_modules/
-**/node_modules/
-
-# Generated files
-build/
-dist/
-coverage/
-
-# Temporary files
+node_modules
+.git
 *.log
 *.bak
-*.step*.bak
-*.cloudops-backup
-*.tmp
-
-# Environment files
-.env
-.env.*
-!.env.example
-
-# Editor and Git files
-.git/
-.vscode/
-.idea/
-.DS_Store

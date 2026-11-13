@@ -1,66 +1,197 @@
-# .github/workflows/pipeline.yml
-name: IncidentCommand Pipeline
-on: [push, pull_request]
+
+name: IncidentCommand DevSecOps Pipeline
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   lint:
+    name: Backend Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: cd backend && npm install && npm run lint
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+        run: npm ci --prefix backend
+
+      - name: Run ESLint
+        run: npm run lint --prefix backend
 
   sast:
+    name: Static Security Analysis
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: returntocorp/semgrep-action@v1
-        with: { config: auto }            # warn only in S0-S1
-      - run: pip install --break-system-packages bandit && bandit -r services/ -l || true
+
+      - name: Install Semgrep and Bandit
+        run: |
+          python -m pip install semgrep bandit
+
+      - name: Run Semgrep
+        run: |
+          semgrep scan --config auto \
+            backend/src services/runbook/app \
+            --json --output semgrep-report.json \
+            || true
+
+      - name: Run Bandit
+        run: |
+          bandit -r services/runbook/app \
+            -f json -o bandit-report.json \
+            || true
+
+      - name: Upload SAST reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sast-reports
+          path: |
+            semgrep-report.json
+            bandit-report.json
+          if-no-files-found: warn
 
   build:
+    name: Build and Validate Containers
     runs-on: ubuntu-latest
     needs: [lint, sast]
     steps:
       - uses: actions/checkout@v4
-      - run: podman build -t incidentcmd-api ./backend
-      - run: podman build -t incidentcmd-runbook ./services/runbook
-      - run: podman build -t incidentcmd-frontend ./frontend
-      - run: podman save -o api.tar incidentcmd-api
-      - run: podman save -o runbook.tar incidentcmd-runbook
-      - run: podman save -o frontend.tar incidentcmd-frontend
-      - uses: actions/upload-artifact@v4
+
+      - uses: actions/setup-node@v4
         with:
-          name: built-images
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci --prefix frontend
+
+      - name: Build React frontend
+        run: CI=true npm run build --prefix frontend
+
+      - name: Build API image
+        run: |
+          podman build \
+            -t localhost/incidentcmd-api:sprint3 \
+            -f backend/Containerfile backend
+
+      - name: Build Runbook image
+        run: |
+          podman build \
+            -t localhost/incidentcmd-runbook:sprint3 \
+            -f services/runbook/Containerfile services/runbook
+
+      - name: Build CloudOps frontend image
+        run: |
+          podman build \
+            -t localhost/incidentcmd-frontend:sprint3 \
+            -f frontend/Containerfile.cloudops frontend
+
+      - name: Export container images
+        run: |
+          podman save --format docker-archive \
+            -o api.tar localhost/incidentcmd-api:sprint3
+
+          podman save --format docker-archive \
+            -o runbook.tar localhost/incidentcmd-runbook:sprint3
+
+          podman save --format docker-archive \
+            -o frontend.tar localhost/incidentcmd-frontend:sprint3
+
+      - name: Upload container images
+        uses: actions/upload-artifact@v4
+        with:
+          name: sprint3-container-images
           path: |
             api.tar
             runbook.tar
             frontend.tar
+          retention-days: 3
 
   scan:
+    name: Trivy and Grype Security Scanning
     runs-on: ubuntu-latest
     needs: build
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+
+      - name: Download container images
+        uses: actions/download-artifact@v4
         with:
-          name: built-images
+          name: sprint3-container-images
+
       - name: Install Trivy
-        run: curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
-      - run: trivy image --input api.tar     --exit-code 0   # warn S0-S2
-      - run: trivy image --input runbook.tar --exit-code 0
+        uses: aquasecurity/setup-trivy@v0.2.4
+
+      - name: Install Grype
+        run: |
+          curl -sSfL \
+            https://raw.githubusercontent.com/anchore/grype/main/install.sh \
+            | sh -s -- -b "$HOME/.local/bin"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Scan images with Trivy
+        run: |
+          mkdir -p security-reports
+
+          for service in api runbook frontend; do
+            trivy image \
+              --input "${service}.tar" \
+              --scanners vuln \
+              --severity HIGH,CRITICAL \
+              --exit-code 0 \
+              --format table \
+              --output "security-reports/trivy-${service}.txt"
+          done
+
+      - name: Scan images with Grype
+        run: |
+          for service in api runbook frontend; do
+            grype "docker-archive:${service}.tar" \
+              --only-fixed \
+              -o table \
+              > "security-reports/grype-${service}.txt"
+          done
+
+      - name: Upload vulnerability reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sprint3-vulnerability-reports
+          path: security-reports/
+          if-no-files-found: warn
 
   policy:
+    name: Infrastructure Policy Scanning
     runs-on: ubuntu-latest
     needs: build
     steps:
       - uses: actions/checkout@v4
+
       - name: Install Checkov
-        run: pip install --break-system-packages checkov
-      - run: checkov -d infra/ --soft-fail   # warn S0-S3
+        run: python -m pip install checkov
+
+      - name: Scan infrastructure
+        run: checkov -d infra/ --soft-fail
 
   deploy:
+    name: Deployment Placeholder
     runs-on: ubuntu-latest
     needs: [scan, policy]
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
-      - run: echo "Deploy step — implement in Sprint 2"
+      - name: Deployment notice
+        run: |
+          echo "CI/CD validation complete."
+          echo "Production deployment is not configured."

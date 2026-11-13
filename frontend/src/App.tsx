@@ -16,10 +16,72 @@ type Incident = {
   status: string;
   declared_by: string;
   declared_at: string;
+  escalation_sent_at: string | null;
 };
 
 type Page = 'Overview' | 'Incidents' | 'Alerts' | 'Runbooks';
 type Theme = 'light' | 'dark';
+
+const ESCALATION_MINUTES: Record<string, number> = {
+  P0: 5,
+  P1: 15,
+  P2: 60,
+};
+
+function getEscalationStatus(incident: Incident, now: number) {
+  const priority = incident.priority.toUpperCase();
+  const threshold = ESCALATION_MINUTES[priority];
+
+  if (incident.escalation_sent_at) {
+    return {
+      label: 'Escalation Recorded',
+      detail: new Date(incident.escalation_sent_at).toLocaleString(),
+      color: '#15803d',
+    };
+  }
+
+  if (['resolved', 'closed'].includes(incident.status.toLowerCase())) {
+    return {
+      label: 'Incident Closed',
+      detail: 'No escalation recorded',
+      color: '#64748b',
+    };
+  }
+
+  if (!threshold) {
+    return {
+      label: 'Not Applicable',
+      detail: 'No automatic escalation configured',
+      color: '#64748b',
+    };
+  }
+
+  const declared = new Date(incident.declared_at).getTime();
+
+  if (!Number.isFinite(declared)) {
+    return {
+      label: 'Unknown',
+      detail: 'Invalid declaration timestamp',
+      color: '#64748b',
+    };
+  }
+
+  const remaining = declared + threshold * 60000 - now;
+
+  if (remaining <= 0) {
+    return {
+      label: 'Escalation Overdue',
+      detail: `${threshold}-minute threshold exceeded`,
+      color: '#dc2626',
+    };
+  }
+
+  return {
+    label: 'Escalation Pending',
+    detail: `${Math.ceil(remaining / 60000)} minute(s) remaining`,
+    color: '#d97706',
+  };
+}
 
 function App() {
   const [incidents, setIncidents] = useState<Incident[]>([]);
@@ -30,39 +92,67 @@ function App() {
   const [search, setSearch] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('All');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [now, setNow] = useState(Date.now());
+
+ useEffect(() => {
+  const timer = window.setInterval(() => {
+    setNow(Date.now());
+  }, 1000);
+
+  return () => window.clearInterval(timer);
+}, []);
 
   useEffect(() => {
-    const controller = new AbortController();
+  const controller = new AbortController();
 
-    async function loadIncidents() {
-      try {
-        const response = await fetch('/api/incidents', {
-          signal: controller.signal
-        });
+  async function loadIncidents() {
+    try {
+      const response = await fetch('/api/incidents', {
+        signal: controller.signal,
+      });
 
-        if (!response.ok) {
-          throw new Error(`API returned HTTP ${response.status}`);
-        }
+      if (!response.ok) {
+        throw new Error(`API returned HTTP ${response.status}`);
+      }
 
-        const data: Incident[] = await response.json();
-        if (!controller.signal.aborted) {
-          setIncidents(data);
-          setSelectedId(data[0]?.id ?? null);
-        }
-      } catch (err) {
-        if (!controller.signal.aborted) {
-          setError(
-            err instanceof Error ? err.message : 'Failed to load incidents'
-          );
-        }
-      } finally {
-        if (!controller.signal.aborted) setLoading(false);
+      const data: Incident[] = await response.json();
+
+      if (!controller.signal.aborted) {
+        setIncidents(data);
+
+        setSelectedId((previous) =>
+          previous && data.some((incident) => incident.id === previous)
+            ? previous
+            : data[0]?.id ?? null
+        );
+
+        setError(null);
+      }
+    } catch (err) {
+      if (!controller.signal.aborted) {
+        setError(
+          err instanceof Error ? err.message : 'Failed to load incidents'
+        );
+      }
+    } finally {
+      if (!controller.signal.aborted) {
+        setLoading(false);
       }
     }
+  }
 
-    loadIncidents();
-    return () => controller.abort();
-  }, []);
+  void loadIncidents();
+
+  const interval = window.setInterval(() => {
+    void loadIncidents();
+  }, 15000);
+
+  return () => {
+    controller.abort();
+    window.clearInterval(interval);
+  };
+}, []);
+
 
   const activeIncidents = incidents.filter(
     (incident) =>
@@ -70,8 +160,8 @@ function App() {
   );
 
   const criticalIncidents = incidents.filter(
-    (incident) => incident.priority.toUpperCase() === 'P1'
-  );
+  (incident) => ['P0', 'P1', 'P3'].includes(incident.priority.toUpperCase())
+);
 
   const filteredIncidents = incidents.filter((incident) => {
     const matchesSearch = incident.title
@@ -91,7 +181,7 @@ function App() {
   const metrics = [
     { label: 'Total Incidents', value: incidents.length, icon: '📋' },
     { label: 'Active Incidents', value: activeIncidents.length, icon: '⚡' },
-    { label: 'Critical / P1', value: criticalIncidents.length, icon: '🚨' }
+    { label: 'Critical / P0–P3', value: criticalIncidents.length, icon: '🚨' }
   ];
 
   return (
@@ -203,10 +293,10 @@ function App() {
                       }
                     >
                       <option value="All">All priorities</option>
-                      <option value="P1">P1</option>
-                      <option value="P2">P2</option>
-                      <option value="P3">P3</option>
-                      <option value="P4">P4</option>
+                      <option value="P1">P0</option>
+                      <option value="P2">P1</option>
+                      <option value="P3">P2</option>
+                      <option value="P4">P3</option>
                     </select>
                   </div>
 
@@ -255,6 +345,65 @@ function App() {
                       status={selectedIncident.status}
                     />
 
+                    <div
+  className="cloudops-card"
+  style={{ marginTop: 20, marginBottom: 20 }}
+>
+  <h3>⏱ Escalation Monitoring</h3>
+
+  {(() => {
+    const escalation = getEscalationStatus(selectedIncident, now);
+
+    return (
+      <>
+        <p>
+          <strong>Priority:</strong> {selectedIncident.priority}
+        </p>
+
+        <p>
+          <strong>Threshold:</strong>{' '}
+          {ESCALATION_MINUTES[selectedIncident.priority.toUpperCase()]
+            ? `${ESCALATION_MINUTES[
+                selectedIncident.priority.toUpperCase()
+              ]} minutes`
+            : 'Not configured'}
+        </p>
+
+        <p>
+          <strong>Status:</strong>{' '}
+          <span style={{ color: escalation.color, fontWeight: 700 }}>
+            {escalation.label}
+          </span>
+        </p>
+
+        <p style={{ color: 'var(--cloud-muted)' }}>
+          {escalation.detail}
+        </p>
+      </>
+    );
+  })()}
+
+  <hr style={{ margin: '20px 0' }} />
+
+  <h3>📄 Incident Post-Mortem</h3>
+
+  <p style={{ color: 'var(--cloud-muted)' }}>
+    Download the incident report with its details,
+    alert events, and runbook activities.
+  </p>
+
+  <a
+    className="cloudops-button"
+    href={`/api/runbooks/incident/${selectedIncident.id}/postmortem`}
+    download={`postmortem-${selectedIncident.id}.pdf`}
+    style={{
+      display: 'inline-block',
+      textDecoration: 'none',
+    }}
+  >
+    ⬇ Download Post-Mortem PDF
+  </a>
+</div>
                     <ResponderList incidentId={selectedIncident.id} />
                     <RunbookViewer incidentId={selectedIncident.id} />
                     <IncidentTimeline incidentId={selectedIncident.id} />
