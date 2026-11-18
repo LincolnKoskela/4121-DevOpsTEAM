@@ -191,6 +191,14 @@ jobs:
 
       - name: Scan infrastructure
         run: checkov -d infra/
+      - name: Install OPA
+        run: |
+          curl -fsSL -o opa https://openpolicyagent.org/downloads/latest/opa_linux_amd64_static
+          chmod +x opa
+          sudo mv opa /usr/local/bin/opa
+
+      - name: Test OPA policies
+        run: opa test policy/rego/ -v
 
   deploy:
     name: Deployment Placeholder
