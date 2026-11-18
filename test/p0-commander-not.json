@@ -1,6 +1,0 @@
-{
-  "method": "PATCH",
-  "path": ["incidents", "INC-1001", "status"],
-  "user": { "role": "responder" },
-  "body": { "status": "closed" }
-}
